@@ -23,7 +23,7 @@ onMounted(async () => {
         <thead>
           <tr>
             <th>编号</th><th>主题域</th><th>业务日</th><th>门店编码</th><th>门店名称</th>
-            <th>品类</th><th>金额</th><th>件数</th>
+            <th>品类</th><th>金额</th><th>件数</th><th>装载时间</th>
           </tr>
         </thead>
         <tbody>
@@ -36,6 +36,7 @@ onMounted(async () => {
             <td>{{ r.category }}</td>
             <td>{{ r.amount }}</td>
             <td>{{ r.qty }}</td>
+            <td>{{ r.loaded_at }}</td>
           </tr>
         </tbody>
       </table>

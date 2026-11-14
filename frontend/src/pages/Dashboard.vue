@@ -50,6 +50,41 @@ const meter = computed(() => {
         <div class="item"><div class="label">汇总层</div><div class="value">{{ data.分层计数.汇总层 }}</div></div>
       </div>
 
+      <div class="panel" v-if="data.待重算迟到日数">
+        <h3>
+          待重算迟到业务日
+          <span class="badge badge-late">{{ data.待重算迟到日数 }} 日</span>
+        </h3>
+        <table>
+          <thead><tr><th>主题域</th><th>业务日</th><th>状态</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr v-for="(d, i) in data.待重算迟到日" :key="i">
+              <td>{{ d.主题域 }}</td>
+              <td>{{ d.业务日 }}</td>
+              <td><span class="badge badge-late">{{ d.状态 }}</span></td>
+              <td class="note-cell">{{ d.说明 }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="muted small-note">请到「分层任务」或「层间对账」执行定点重算，仅重算这些业务日，不清空全表。</p>
+      </div>
+
+      <div class="panel" v-if="data.最近定点重算.length">
+        <h3>最近定点重算</h3>
+        <table>
+          <thead><tr><th>编号</th><th>主题域</th><th>业务日数</th><th>明细行数（前 → 后）</th><th>汇总一致</th></tr></thead>
+          <tbody>
+            <tr v-for="j in data.最近定点重算" :key="j.编号">
+              <td>{{ j.编号 }}</td>
+              <td>{{ j.主题域 }}</td>
+              <td>{{ j.业务日数 }}</td>
+              <td>{{ j.明细行数 }}</td>
+              <td><span :class="j.汇总一致 === '是' ? 'ok' : 'warn'">{{ j.汇总一致 }}</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
       <div class="panel">
         <h3>最近分层任务</h3>
         <table v-if="data.最近任务.length">

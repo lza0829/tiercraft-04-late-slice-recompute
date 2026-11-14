@@ -21,7 +21,7 @@ onMounted(async () => {
     <div class="panel">
       <table>
         <thead>
-          <tr><th>编号</th><th>名称</th><th>业务键</th><th>夹具文件</th><th>说明</th></tr>
+          <tr><th>编号</th><th>名称</th><th>业务键</th><th>夹具文件</th><th>待重算迟到日</th><th>说明</th></tr>
         </thead>
         <tbody>
           <tr v-for="d in rows" :key="d.id">
@@ -29,6 +29,10 @@ onMounted(async () => {
             <td>{{ d.name }}</td>
             <td>{{ d.biz_key }}</td>
             <td>{{ d.fixture_file }}</td>
+            <td>
+              <span v-if="d.pending_late_days" class="badge badge-late">迟到 {{ d.pending_late_days }} 日</span>
+              <span v-else class="muted">无</span>
+            </td>
             <td>{{ d.description }}</td>
           </tr>
         </tbody>

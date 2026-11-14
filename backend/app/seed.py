@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS layer_paste (
   amount REAL NOT NULL,
   qty INTEGER NOT NULL,
   raw_json TEXT NOT NULL,
+  loaded_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now')),
   FOREIGN KEY(domain_id) REFERENCES domains(id)
 );
 
@@ -62,7 +63,7 @@ CREATE TABLE IF NOT EXISTS layer_jobs (
   in_count INTEGER NOT NULL DEFAULT 0,
   out_count INTEGER NOT NULL DEFAULT 0,
   drop_count INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now')),
   FOREIGN KEY(domain_id) REFERENCES domains(id)
 );
 
@@ -79,6 +80,58 @@ CREATE TABLE IF NOT EXISTS reconcile_reports (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY(domain_id) REFERENCES domains(id)
 );
+
+-- 业务日明细水位线：该业务日最近一次被成功明细加工覆盖的时间与任务
+CREATE TABLE IF NOT EXISTS day_watermarks (
+  domain_id INTEGER NOT NULL,
+  biz_day TEXT NOT NULL,
+  last_detail_job_id INTEGER NOT NULL,
+  last_detail_at TEXT NOT NULL,
+  PRIMARY KEY(domain_id, biz_day),
+  FOREIGN KEY(domain_id) REFERENCES domains(id)
+);
+
+-- 迟到业务日：贴源新行晚于该业务日最近一次成功明细任务时登记
+CREATE TABLE IF NOT EXISTS late_days (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  domain_id INTEGER NOT NULL,
+  biz_day TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT '待重算',
+  trigger_paste_id INTEGER,
+  last_detail_job_id INTEGER,
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now')),
+  UNIQUE(domain_id, biz_day),
+  FOREIGN KEY(domain_id) REFERENCES domains(id)
+);
+
+-- 定点重算任务报告（只重算受影响业务日，禁止全表清空）
+CREATE TABLE IF NOT EXISTS recompute_jobs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  domain_id INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  day_count INTEGER NOT NULL DEFAULT 0,
+  detail_before INTEGER NOT NULL DEFAULT 0,
+  detail_after INTEGER NOT NULL DEFAULT 0,
+  summary_amount_before REAL NOT NULL DEFAULT 0,
+  summary_amount_after REAL NOT NULL DEFAULT 0,
+  consistent INTEGER NOT NULL DEFAULT 0,
+  message TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(domain_id) REFERENCES domains(id)
+);
+
+CREATE TABLE IF NOT EXISTS recompute_day_lines (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  recompute_job_id INTEGER NOT NULL,
+  biz_day TEXT NOT NULL,
+  detail_before INTEGER NOT NULL,
+  detail_after INTEGER NOT NULL,
+  summary_amount_before REAL NOT NULL,
+  summary_amount_after REAL NOT NULL,
+  FOREIGN KEY(recompute_job_id) REFERENCES recompute_jobs(id)
+);
 """
 
 
@@ -86,12 +139,23 @@ def init_db() -> None:
     conn = connect()
     try:
         conn.executescript(SCHEMA)
+        _upgrade(conn)
         row = conn.execute("SELECT COUNT(*) AS c FROM domains").fetchone()
         if int(row["c"]) == 0:
             _seed_domain(conn)
         conn.commit()
     finally:
         conn.close()
+
+
+def _upgrade(conn) -> None:
+    """对早期库做幂等补列。"""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(layer_paste)").fetchall()}
+    if "loaded_at" not in cols:
+        conn.execute(
+            "ALTER TABLE layer_paste ADD COLUMN loaded_at TEXT NOT NULL DEFAULT "
+            "(strftime('%Y-%m-%d %H:%M:%f', 'now'))"
+        )
 
 
 def _seed_domain(conn) -> None:
